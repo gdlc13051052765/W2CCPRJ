@@ -49,8 +49,8 @@ void can1_frame_parse(void* ret_msg)
 		}
 		case Android_CC_EMPTY_ADDR_AND_UP_CPUID:
 		{
-			int a = rand()%299 +1000;
-			int b = rand()%1999 +1000;
+			int a = (rand()%19)*100 +500;
+			int b = (rand()%19)*100 +500;
 			TaskSetTimes(TASK_CC_RADIO_ANDROID,a+b);
 			EnableTask(TASK_CC_RADIO_ANDROID);//使能CC广播任务
 			debug_print("send Android_CC_EMPTY_ADDR_AND_UP_CPUID \r\n");
