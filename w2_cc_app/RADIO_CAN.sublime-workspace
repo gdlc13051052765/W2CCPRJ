@@ -1,0 +1,567 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"w",
+				"while"
+			],
+			[
+				"g",
+				"g_plevel1_menu"
+			],
+			[
+				"int",
+				"int8_t"
+			],
+			[
+				"me",
+				"menu_bar"
+			],
+			[
+				"u",
+				"uint8_t"
+			],
+			[
+				"p",
+				"pbar"
+			],
+			[
+				"to",
+				"touch_key_cnt"
+			],
+			[
+				"TOUCH_ke",
+				"TOUCH_KEY_VALUE_CONFIRM_HOLD"
+			],
+			[
+				"touch",
+				"touch_key_cnt"
+			],
+			[
+				"uin",
+				"uint16_t"
+			],
+			[
+				"touc",
+				"touch_key_val"
+			],
+			[
+				"le",
+				"level"
+			],
+			[
+				"def",
+				"define"
+			],
+			[
+				"data",
+				"data_left_Length"
+			],
+			[
+				"dat",
+				"data_offset"
+			],
+			[
+				"l",
+				"length_temp"
+			],
+			[
+				"ui",
+				"uint8_t"
+			],
+			[
+				"pot",
+				"pdot"
+			],
+			[
+				"LE",
+				"LEVEL1_MENU"
+			],
+			[
+				"L",
+				"LEVEL1_MENU"
+			],
+			[
+				"TOU",
+				"TOUCH_KEY_VALUE_CONFIRM"
+			],
+			[
+				"level2",
+				"level2_offset"
+			],
+			[
+				"level2_",
+				"level2_menu_index"
+			],
+			[
+				"Gt",
+				"GT32L32_FLASH_BASE"
+			],
+			[
+				"Men",
+				"Menu_MAX_FOOD_NUM"
+			],
+			[
+				"menu_update_wo",
+				"MENU_UPDATE_WORK_STATUS_RUNNING"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"contents": "#include \"interface.h\"\n#include \"includes.h\" \n \n \nextern _App_Param mApp_Param;\n\n/*==================================================================================\n* 函 数 名： inter_init\n* 参    数： None\n* 功能描述:  接口协议初始化\n* 返 回 值： None\n* 备    注： 默认间隔10ms进行接收数据解析\n* 作    者： xiaozh\n* 创建时间： 2019-09-23 180348\n==================================================================================*/\nvoid inter_init(void)\n{  \n\t\n}\n\n/*==================================================================================\n* 函 数 名： read_config_param\n* 参    数： _pApp_Config_Param\n* 功能描述:  读取配置参数\n* 返 回 值： None\n* 备    注： \n* 作    者： xiaozh\n* 创建时间： 2019-09-06 115746\n==================================================================================*/\nuint8_t read_config_param(void* c_param)\n{\n\t_pApp_Param pmsg = c_param;\n\t\n\tpFunc_Func->read(APP_CONFIG_ADDR, pmsg->config_param.flash_buff, MAX_USE_FLASH_SIZE*2);\t//读取参数\n\t\n\t//判断参数是否合法\n\tif(crc32(pmsg->config_param.flash_buff, pmsg->config_param._Use_Param.crc_data_len) == pmsg->config_param._Use_Param.crc32)\t//判断校验是否合法\n\t{\n\t\t//判断每一项参数是否合法\n\t\tif(pmsg->config_param._Use_Param.radio_addr == ((~pmsg->config_param._Use_Param.radio_addr_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->si_rx_addr = pmsg->config_param._Use_Param.radio_addr;\n\t\t}\n\t\t\n\t\tif(pmsg->config_param._Use_Param.ms_radio_addr == ((~pmsg->config_param._Use_Param.ms_radio_addr_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->ms_si_rx_addr = pmsg->config_param._Use_Param.ms_radio_addr;\n\t\t}\n\t\t\n\t\tif(pmsg->config_param._Use_Param.hard_ver == ((~pmsg->config_param._Use_Param.hard_ver_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->hard_ver = pmsg->config_param._Use_Param.hard_ver;\n\t\t}\n\t\t\n\t\tif(pmsg->config_param._Use_Param.base_channel_num == ((~pmsg->config_param._Use_Param.base_channel_num_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->si_base_num = pmsg->config_param._Use_Param.base_channel_num;\n\t\t}\n\t\t  \n\t}\n\telse\n\t{\n\t\t//校验出错使用默认配置参数\n\t\tpmsg->si_base_num = SI_BASE_CHANNLE_NUM;\n\t\tpmsg->si_rx_addr = SI_SLAVE_RX_ADDDR;\n\t\tpmsg->ms_si_rx_addr = SI_MASTER_RX_ADDR; \n\t}\n\treturn 0;\n}\n \n/*==================================================================================\n* 函 数 名： si_sed_loop_task\n* 参    数： None\n* 功能描述:  si4463自动发包，定时50\n* 返 回 值： None\n* 备    注： 循环检测缓存，如果有数据则进行发送\n* 作    者： xiaozh\n* 创建时间： 2019-09-17 122635\n==================================================================================*/ \nvoid si_sed_loop_check(void* const instance)\n{ \n\tuint8_t cur_index = 0;\n\t_pSi446x_Instance pthis = instance;\n\t_pSi_Fifo pmsg = pthis->sed_fifo; \n\n\t//检查缓存是否为空\n\tif((cur_index = si_fifo_get(pthis->sed_fifo, 0)) == 0xFF)\n\t{\n\t\tgoto error;\n\t}\n\t \n\t//不为空这发送缓存中的数据 \n\tsi446x_sed_long_message(instance, pmsg->item[cur_index].pkt_buff.ip.channel,  pmsg->item[cur_index].pkt_buff.ip.match, pmsg->item[cur_index].pkt_buff.buff,  pmsg->item[cur_index].pkt_buff.lenght);\n\t \n\t//等待发送完成\n\t\n\t//标记已经发送，等待响应，标记缓存为已发送，未确定响应\n\t\n\t//释放缓存数据\n\tsi_fifo_free_item(pmsg, cur_index);\n\t\n\terror:\n\t  __NOP();\n}\n  \n/*==================================================================================\n* 函 数 名： can_rev_decode\n* 参    数： None\n* 功能描述:  can协议解析\n* 返 回 值： None\n* 备    注： none\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 172557\n==================================================================================*/\nvoid can_rev_decode(void)\n{\n\t_Ret_Msg c_msg; \n\t \n\tif(can_pop_one_frame(&c_msg) > 0)\t\t//获取数据\n\t{ \n\t\t//协议解析\n\t\tcan_frame_parse(&c_msg);\t\t\n\t} \n}\n\n/*==================================================================================\n* 函 数 名： can_sed_loop_task\n* 参    数： None\n* 功能描述:  CAN定时发送任务\n* 返 回 值： None\n* 备    注： 默认间隔20ms发送一次\n* 作    者： xiaozh\n* 创建时间： 2019-09-23 180348\n==================================================================================*/\nvoid can_sed_loop_task(void* argv)\n{  \n\tcan_sed_loop_check();\t\n}\n\n/*==================================================================================\n* 函 数 名： HAL_CAN_RxFifo0MsgPendingCallback\n* 参    数： None\n* 功能描述:  接收完成\n* 返 回 值： None\n* 备    注： 短包\n* 作    者：  \n* 创建时间： 2019-09-23 180101\n==================================================================================*/\nvoid HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan1) \n{\n\t_Can_Msg Can_Msg;\n\tCAN_RxHeaderTypeDef mCan_Header;\n\t\n\t//读取数据\n\tHAL_CAN_GetRxMessage(hcan1,CAN_RX_FIFO0, &mCan_Header, (uint8_t*)Can_Msg.data);\n\tCan_Msg.ex_id.EX_ID = mCan_Header.ExtId;\n\tCan_Msg.byte_count = mCan_Header.DLC;\n\t \n\t//拷贝参数 \n\tcan_recv_signal_frame(&Can_Msg);\n\t\n\t//使能中断\n\t__HAL_CAN_ENABLE_IT(hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);\n}\n\n/*==================================================================================\n* 函 数 名： HAL_CAN_RxFifo0MsgPendingCallback\n* 参    数： None\n* 功能描述:  接收完成\n* 返 回 值： None\n* 备    注： 长包\n* 作    者：  \n* 创建时间： 2019-09-23 180101\n==================================================================================*/\nvoid HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan1) \n{\n\t_Can_Msg Can_Msg;\n\tCAN_RxHeaderTypeDef mCan_Header;\n\t\n\t//读取数据\n\tHAL_CAN_GetRxMessage(hcan1,CAN_RX_FIFO1, &mCan_Header, (uint8_t*)Can_Msg.data);\n\tCan_Msg.ex_id.EX_ID = mCan_Header.ExtId;\n\tCan_Msg.byte_count = mCan_Header.DLC;\n\t \n\t//拷贝参数  \n\tcan_recv_mutil_frame(&Can_Msg);\n\t\n\t\t\n//\tdebug_print(\"can_rev irq,\");\n//\tdebug_print(\"ex_id:%4x, \", Can_Msg.ex_id.EX_ID);\n//\tdebug_print(\"lens=%02x, \", Can_Msg.byte_count);\n//\tdebug_print(\"rev_data:\");\n//\tdebug_print_hex(Can_Msg.data, Can_Msg.byte_count);\n//\tdebug_print(\"\\n\");\n\t\n\t//使能中断\n\t__HAL_CAN_ENABLE_IT(hcan1, CAN_IT_RX_FIFO1_MSG_PENDING);\n}\n\nvoid HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)\n{\n\tdebug_print(\"can error\\n\");\n}\n\n\n\n/*==================================================================================\n* 函 数 名： si_sed_buff\n* 参    数： None\n* 功能描述:  si4463发送包\n* 返 回 值： None\n* 备    注： try_time ： =0不需要ACK  >0需要ACK\n* 作    者： xiaozh\n* 创建时间： 2019-10-09 183829\n==================================================================================*/ \nuint8_t si_sed_buff(void *instance, uint8_t to_addr, uint8_t *buff, uint16_t len, uint8_t try_time)\n{  \n\tuint8_t step_count = 0;\n\tuint32_t crc_value= 0;\n\t_Si_Pkt si_pkt;\n\t_pSi446x_Instance pthis = instance;\n\t\n\tsi_pkt.ip.channel = ADDR_TO_CHANNEL(to_addr);\t\t//通过地址计算发送通道\n\tsi_pkt.ip.match = ADDR_TO_MATCH(to_addr);\t\t//通过地址计算发送match\n\n\tsi_pkt.pointer = 0;\n\t \n\tsi_pkt.buff[step_count++] = to_addr;\t//目的地址\n\tsi_pkt.buff[step_count++] = mApp_Param.si_rx_addr;//源地址\n\t\n\tfor(int i=0; i<len; i++)\n\t{\n\t\tsi_pkt.buff[step_count++] = buff[i];\n\t}\n\t\n\tcrc_value = st_crc32(si_pkt.buff, step_count);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>0)&0x000000FF);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>8)&0x000000FF);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>16)&0x000000FF);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>24)&0x000000FF);\n\t\n\tsi_pkt.lenght = step_count;\n\tsi_fifo_push(pthis->sed_fifo, &si_pkt, try_time);\t//放入缓存\t\n\treturn 0;\n}\n\n\n\n\n",
+			"file": "Application/src/interface.c",
+			"file_size": 7469,
+			"file_write_time": 132477259034323430,
+			"settings":
+			{
+				"buffer_size": 6762,
+				"encoding": "Western (Windows 1252)",
+				"line_ending": "Windows",
+				"scratch": true
+			}
+		},
+		{
+			"contents": "#include \"comm_can.h\" \n#include \"crc.h\"\n#include \"can_def_fifo.h\"\n\nextern CAN_HandleTypeDef hcan;\n\n_Mutil_Ring \t mMutil_Ring[MAX_MUTIL_ITEM_NUM];\t\t//多包接收 \nstatic uint64_t mutil_mark_table[64] = {0};\n\n_Can_Instance mCan_Instance;\n \nstatic _Can_Msg can_sed_fifo[CAN_MAX_CACHE_LEN];\t//can发送缓存\nstatic _Can_Msg can_rev_fifo[CAN_MAX_CACHE_LEN];\t//can接收缓存（单帧）\n\n#define ID_MASK\t\t\t0xFCFFFFFF\n#define COMPARE_ID(ID1, ID2) (((ID1&ID_MASK) == (ID2&ID_MASK))?(1):(0))\t\t//对比两个ID是否相同，长包\n\n/*==================================================================================\n* 函 数 名： can_instance_init\n* 参    数： None\n* 功能描述:  can初始化\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 170617\n==================================================================================*/\nvoid can_instance_init(void)\n{  \n\tmCan_Instance.p_ffunc\t= pCan_Fifo_Func,\n\t//发送接收缓存初始化（单帧） \n\t mCan_Instance.Sed_Fifo = mCan_Instance.p_ffunc->init_m(can_sed_fifo, CAN_MAX_CACHE_LEN);\n\t mCan_Instance.Rcv_Fifo = mCan_Instance.p_ffunc->init_m(can_rev_fifo, CAN_MAX_CACHE_LEN); \n\t\n\t//长帧接收初始化\n\tmCan_Instance.pMutil_Fifo = mMutil_Ring;\n\t\n\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\n\t{\n\t\tmMutil_Ring[i].ex_id.EX_ID = 0;\n\t\tmMutil_Ring[i].in_use = 0;\n\t\tmMutil_Ring[i].is_complete = 0;\n\t\tmMutil_Ring[i].real_mark = 0;\n\t\tmemset(mMutil_Ring[i].r_data, 0, sizeof(mMutil_Ring[i].r_data));\n\t}\n\n\tfor(int i=0; i<64; i++)\n\t{\n\t\tfor(int j=0; j<i+1; j++)\n\t\t{\n\t\t\tmutil_mark_table[i] |= (0x0000000000000001<<j);\t\t//空间换时间\n\t\t}\n\t} \n}\n \n/*==================================================================================\n* 函 数 名： find_avalib_node\n* 参    数： None\n* 功能描述:  查找可以节点\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 161141\n==================================================================================*/\nstatic uint8_t find_null_node(void)\n{\n\t//查询可用空节点索引\n\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\t//从后往前查找可用的ID号\n\t{\n\tif(mMutil_Ring[i].in_use == 0)\n\t\t{\n\t\t\treturn i;\n\t\t}\n\t}\n\n\treturn 0xFF;\t//空，没有可用\n}\n\n/*==================================================================================\n* 函 数 名： delete_item_node\n* 参    数： None\n* 功能描述:  清空节点\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 161141\n==================================================================================*/\nstatic uint8_t delete_item_node(uint8_t index)\n{  \n\t  //清空缓存\n\tmMutil_Ring[index].in_use = 0;\t//删除不合法帧 \n\tmMutil_Ring[index].is_complete = 0;\n\tmMutil_Ring[index].ex_id.EX_ID = 0;\n\tmMutil_Ring[index].real_mark = 0;\n\tmMutil_Ring[index].r_len = 0;\n\treturn 0;\n}\n\n/*==================================================================================\n* 函 数 名： item_is_exist\n* 参    数： None\n* 功能描述:  查看是否已经存在\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 161141\n==================================================================================*/\nstatic uint8_t item_is_exist(uint32_t ex_id)\n{\n\tuint8_t ret_index = 0xFF;\t//返回的节点索引\n\t_pEx_id pmsg = (_pEx_id)&ex_id; \n\t\n\t//查询当前地址是否已经有缓存帧\n\tfor(int j=0; j<MAX_MUTIL_ITEM_NUM; j++)\t//从后往前查找可用的ID号\n\t{ \n\t\tif(COMPARE_ID(mMutil_Ring[j].ex_id.EX_ID , ex_id))\t//判断ID是否相同\n\t\t{\n\t\t\tret_index = j;\n\t\t}\n\t}\n\t\n\t//没有接收完成的包，丢了结尾帧情况\n\tif(ret_index == 0xFF)\n\t{\n\t\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\t//从后往前查找可用的ID号\n\t\t{\n\t\t\tif(mMutil_Ring[i].ex_id._bit.s_addr == pmsg->_bit.s_addr)\t//如果存在相同地址\n\t\t\t{\n\t\t\t\tif((mMutil_Ring[i].is_complete == 0)&&(mMutil_Ring[i].in_use != 0))\t//没有接收完成\n\t\t\t\t{\n\t\t\t\t\t//直接覆盖没有接收完整节点\n\t\t\t\t\tmMutil_Ring[i].ex_id.EX_ID = ex_id;\n\t\t\t\t\tmMutil_Ring[i].real_mark = 0;\n\t\t\t\t\tmMutil_Ring[i].r_len = 0;\n\t\t\t\t\tret_index = i;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn ret_index;\t//空，没有可用\n}\n\n/*==================================================================================\n* 函 数 名： can_recv_frame\n* 参    数： _pCan_Msg\n* 功能描述:  can总线数据接收\n* 返 回 值： None\n* 备    注： 在中断\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 154449\n==================================================================================*/\nuint8_t can_recv_mutil_frame(void *can_msg)\n{\n\tuint8_t new_index = 0;\t//申请索引\n\t_pCan_Msg pmsg = can_msg;\n\n\tif(pmsg->ex_id._bit.is_sigle == 0)\t//帧错误\n\t{\n\t\treturn 0x81;\n\t}\n\telse\n\t{\n\t\t//判断当前id是否存在\n\t\tif((new_index = item_is_exist(pmsg->ex_id.EX_ID)) == 0xFF)\n\t\t{\n\t\t\t//不存在，则申请新表\n\t\t\tnew_index = find_null_node(); \n\t\t\t\n\t\t\t//保存到缓存\n\t\t\tmMutil_Ring[new_index].in_use = 0x01;\t//使用中\n\t\t\tmMutil_Ring[new_index].ex_id.EX_ID = pmsg->ex_id.EX_ID;\n\t\t\tmMutil_Ring[new_index].r_len = (pmsg->byte_count-1);\n\t\t\tmemcpy(mMutil_Ring[new_index].r_data, pmsg->data+1, pmsg->byte_count-1);\n\t\t\t//标记接收\n\t\t\tmMutil_Ring[new_index].real_mark = (0x0000000000000001<<pmsg->data[0]);\n\t\t\treturn 0;\n\t\t}\n\t\telse\n\t\t{\n\t\t\t//已经存在\n\t\t\t\n\t\t\t//保存到缓存\n\t\t\tmMutil_Ring[new_index].in_use = 0x01;\t//使用中\n\t\t\tmMutil_Ring[new_index].r_len += (pmsg->byte_count-1);\n\t\t\tmemcpy(mMutil_Ring[new_index].r_data+pmsg->data[0]*7, pmsg->data+1, pmsg->byte_count-1);\t\n\t\t\t//标记接收\n\t\t\tmMutil_Ring[new_index].real_mark |= (0x0000000000000001<<pmsg->data[0]);\n\n\t\t\t//判断是否为末尾帧\n\t\t\tif(pmsg->ex_id._bit.is_sigle == 0x02)\t//末尾帧\n\t\t\t{ \n\t\t\t\tif(mMutil_Ring[new_index].real_mark == mutil_mark_table[pmsg->data[0]])\n\t\t\t\t{ \n\t\t\t\t\tmMutil_Ring[new_index].is_complete = 0x01;\t//接收完成\n\t\t\t\t\tmMutil_Ring[new_index].ex_id._bit.is_sigle = 0x03;\t//接收完成\n\t\t\t\t\t//CRC校验留在协议解析，防止过多占用中断\n\t\t\t\t\tprintf(\"rev complete\\n\");\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{  \n\t\t\t\t\t//清空节点\n\t\t\t\t\tdelete_item_node(new_index);\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\t \n\treturn 0;\n}\n \n/*==================================================================================\n* 函 数 名： can_recv_frame\n* 参    数： _pCan_Msg\n* 功能描述:  can总线数据接收\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 154449\n==================================================================================*/\nuint8_t can_recv_signal_frame(void *can_msg)\n{  \n\tmCan_Instance.p_ffunc->push(mCan_Instance.Rcv_Fifo, can_msg);\n\t\n\treturn 0;\n}\n\n/*==================================================================================\n* 函 数 名： can_pop_one_frame\n* 参    数： _pRet_Msg\n* 功能描述:  can总线数据接收\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 154449\n==================================================================================*/ \nuint8_t can_pop_one_frame(void *ret_msg)\n{\n\t_pRet_Msg pmsg = ret_msg;\n\t\n\t//先查询长帧\n\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\t//从后往前查找可用的ID号\n\t{\n\t\tif(mMutil_Ring[i].is_complete == 0x01)\n\t\t{\n\t\t\tpmsg->ex_id.EX_ID = mMutil_Ring[i].ex_id.EX_ID;\n\t\t\tpmsg->byte_count = mMutil_Ring[i].r_len;\n\t\t\tmemcpy(pmsg->data, mMutil_Ring[i].r_data,  mMutil_Ring[i].r_len);\n\n\t\t\t//清空节点\n\t\t\tdelete_item_node(i);\n\t\t\treturn pmsg->byte_count;\n\t\t}\n\t}\n\t\n\t//查询短帧 \n\tif(\tmCan_Instance.p_ffunc->pop(mCan_Instance.Rcv_Fifo, ret_msg) != 0) \n\t{\n\t\t//查找成功\n\t\treturn pmsg->byte_count;\n\t}\n\t\n\treturn 0;\n}\n\n/*==================================================================================\n* 函 数 名： can_sed_loop_check\n* 参    数： None\n* 功能描述:  CAN循环检测是否有发送的数据\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 171529\n==================================================================================*/\nvoid can_sed_loop_check(void)\n{\n\t_Can_Msg can_msg;\n\n\t//检查是否为空\n\tif(mCan_Instance.p_ffunc->is_empty(mCan_Instance.Sed_Fifo))\t//如果不为空\n\t{\n\t\t//屏蔽全局中断\n\t\t\n\t\t//获取数据\n\t\tmCan_Instance.p_ffunc->pop(mCan_Instance.Sed_Fifo, &can_msg);\n\t\t//开启全局中断\n\n\t\t//发送数据\n\t\tcan_sed_pkg_without_cache(&can_msg);\n\t}\n}\n\n/*==================================================================================\n* 函 数 名： can_sed_link_pkg\n* 参    数： None\n* 功能描述:  发送连包\n* 返 回 值： None\n* 备    注： \n* 作    者：  xiaozh\n* 创建时间： 2019-09-25 162917\n==================================================================================*/\nuint8_t can_sed_link_pkg(uint8_t host_cmd, uint8_t d_addr, uint8_t* buff, uint16_t len)\n{\n\t_Can_Msg c_msg;\n\tuint8_t count = 1;\n\tuint8_t pkg_step = 0;\n\tuint16_t s_len = len;\n\tuint16_t crc16_result = 0;\n\tuint8_t sed_buff[256] = {0};\n\t \n\tif(s_len > 254*7)\n\t{\n//\t\tdebug_print(\"超过can总线最大发包能力\\n\");\n\t\treturn 0x81;\n\t}\n\t\n\tc_msg.ex_id.EX_ID = 0;\n\tc_msg.ex_id._bit.d_addr = d_addr;\n\tc_msg.ex_id._bit.s_addr = CAN_MASTER_ADDR;\n\tc_msg.ex_id._bit.png_cmd = host_cmd;\t\n\t\n\t//判断是否连包\n\tif(s_len <= 8)\n\t{\n\t\tc_msg.byte_count = s_len;\n\t\tmemset(c_msg.data, 0, 8);\n\t\tfor(int j=0; j<s_len; j++)\n\t\t{\n\t\t\tc_msg.data[j] = buff[j]; \n\t\t}\n\t\t\n\t\tmCan_Instance.p_ffunc->push(mCan_Instance.Sed_Fifo, &c_msg); \n\t}\n\telse\n\t{ \n\t\tc_msg.ex_id._bit.is_sigle = 0x01;\t\t//连包数据\n\t\ts_len = len+2;\t//增加CRC16\n\t\t\n\t\tmemcpy(sed_buff, buff, len);\n\t\t//计算CRC16\n\t\tcrc16_result = crc16_ccitt(buff, len);\n\n\t\tsed_buff[len] = (uint8_t)((crc16_result>>0)&0x00FF); \n\t\tsed_buff[len+1] = (uint8_t)((crc16_result>>8)&0x00FF); \n\t\t \n\t\twhile(s_len > 0)\n\t\t{\n\t\t\tcount = 0x01;\n\t\t\tc_msg.data[0] = pkg_step++;\n\n\t\t\t//判断是否为最后一帧数据 \n\t\t\tif(s_len  <= 7)\n\t\t\t{\n\t\t\t\tc_msg.byte_count = s_len+1;\n\t\t\t\tc_msg.ex_id._bit.is_sigle = 0x02;\t\t//连包结尾数据\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tc_msg.byte_count = 8; \n\t\t\t}\n\t\t\t \n\t\t\tfor(int j=0; j<c_msg.byte_count; j++)\n\t\t\t{\n\t\t\t\tc_msg.data[count++] = sed_buff[(pkg_step-1)*7+j]; \n\t\t\t} \n\t\t\t\n\t\t\ts_len -= (c_msg.byte_count-1);\n \n\t\t\t//填充数据 \n\t\t\tmCan_Instance.p_ffunc->push(mCan_Instance.Sed_Fifo, &c_msg);\n\t\t}\n\t}\n\n\treturn 0;\n}\n \n",
+			"file": "Application/src/comm_can.c",
+			"file_size": 9997,
+			"file_write_time": 132477259034325455,
+			"settings":
+			{
+				"buffer_size": 8953,
+				"encoding": "Western (Windows 1252)",
+				"line_ending": "Windows",
+				"scratch": true
+			}
+		},
+		{
+			"contents": "#include \"bsp_init.h\"\n#include \"can_drv.h\"\n\n#include \"main.h\"\n\nCAN_HandleTypeDef hcan;\nCAN_HandleTypeDef hcan2;\n\nSPI_HandleTypeDef hspi1;\nSPI_HandleTypeDef hspi2;\n\nUART_HandleTypeDef huart1;\n\n\n/**\n  * @brief CAN Initialization Function\n  * @param None\n  * @retval None\n  */\n\t\nstatic void MX_CAN_Init(void)\n{\n\tuint32_t filter_value = SIGNAL_MASTER_FILTERID;\n\tuint32_t filter_mask = SIGNAL_MASTER_MASK;\n\n  /* USER CODE BEGIN CAN_Init 0 */\n\n\tCAN_FilterTypeDef CAN_FilterInitStructure;\n  /* USER CODE END CAN_Init 0 */\n\n  /* USER CODE BEGIN CAN_Init 1 */\n\n  /* USER CODE END CAN_Init 1 */\n  hcan.Instance = CAN1;\n  hcan.Init.Prescaler = 16;\n  hcan.Init.Mode = CAN_MODE_NORMAL;\n  hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;\n  hcan.Init.TimeSeg1 = CAN_BS1_1TQ;\n  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;\n  hcan.Init.TimeTriggeredMode = DISABLE;\n  hcan.Init.AutoBusOff = DISABLE;\n  hcan.Init.AutoWakeUp = DISABLE;\n  hcan.Init.AutoRetransmission = DISABLE;\n  hcan.Init.ReceiveFifoLocked = DISABLE;\n  hcan.Init.TransmitFifoPriority = DISABLE;\n  if (HAL_CAN_Init(&hcan) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN CAN_Init 2 */\n  hcan2.Instance = CAN2;\n  hcan2.Init.Prescaler = 16;\n  hcan2.Init.Mode = CAN_MODE_NORMAL;\n  hcan2.Init.SyncJumpWidth = CAN_SJW_1TQ;\n  hcan2.Init.TimeSeg1 = CAN_BS1_1TQ;\n  hcan2.Init.TimeSeg2 = CAN_BS2_1TQ;\n  hcan2.Init.TimeTriggeredMode = DISABLE;\n  hcan2.Init.AutoBusOff = DISABLE;\n  hcan2.Init.AutoWakeUp = DISABLE;\n  hcan2.Init.AutoRetransmission = DISABLE;\n  hcan2.Init.ReceiveFifoLocked = DISABLE;\n  hcan2.Init.TransmitFifoPriority = DISABLE;\n  if (HAL_CAN_Init(&hcan2) != HAL_OK)\n  {\n    Error_Handler();\n  }\n\n\t/*===========================FIFO0 过滤=============================*/\n\t//单包接收\n\tCAN_FilterInitStructure.FilterBank \t= 0;     /* 过滤器组 */\n\tCAN_FilterInitStructure.FilterMode \t\t= CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n\tCAN_FilterInitStructure.FilterScale \t= CAN_FILTERSCALE_32BIT; ///* 32位 */\n\t \n\tCAN_FilterInitStructure.FilterIdHigh \t\t\t= FILTER_MASK_H(filter_value);  \n\tCAN_FilterInitStructure.FilterIdLow \t\t\t= FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n\tCAN_FilterInitStructure.FilterMaskIdHigh \t= FILTER_MASK_H(filter_mask);\n\tCAN_FilterInitStructure.FilterMaskIdLow \t= FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\t  \n\tCAN_FilterInitStructure.FilterFIFOAssignment \t= CAN_FILTER_FIFO0;  ///* 能够通过该过滤器的报文存到fifo0中 */\n\tCAN_FilterInitStructure.FilterActivation = ENABLE;\n\tHAL_CAN_ConfigFilter(&hcan,&CAN_FilterInitStructure);\n\t \n\t/*===========================FIFO1 过滤=============================*/\n\t//多包接收\n\t//过滤组 \n\t filter_value = MUTIL_MASTER_FILTERID;\n\t filter_mask = MUTIL_MASTER_MASK0;\n\t\t \n\t\n\tCAN_FilterInitStructure.FilterBank \t= 1;     /* 过滤器组 */\n\tCAN_FilterInitStructure.FilterMode \t\t= CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n\tCAN_FilterInitStructure.FilterScale \t= CAN_FILTERSCALE_32BIT; ///* 32位 */\n\t \n\tCAN_FilterInitStructure.FilterIdHigh \t\t\t= FILTER_MASK_H(filter_value);  \n\tCAN_FilterInitStructure.FilterIdLow \t\t\t= FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n\tCAN_FilterInitStructure.FilterMaskIdHigh \t= FILTER_MASK_H(filter_mask);\n\tCAN_FilterInitStructure.FilterMaskIdLow \t= FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\t  \n\tCAN_FilterInitStructure.FilterFIFOAssignment \t= CAN_FILTER_FIFO0;  ///* 能够通过该过滤器的报文存到fifo0中 */\n\tCAN_FilterInitStructure.FilterActivation = ENABLE;\n\tHAL_CAN_ConfigFilter(&hcan,&CAN_FilterInitStructure);\n\t\n\t//过滤组\n\t filter_value = MUTIL_MASTER_FILTERID;\n\t filter_mask = MUTIL_MASTER_MASK1;\n\t\n\tCAN_FilterInitStructure.FilterBank \t= 2;     /* 过滤器组 */\n\tCAN_FilterInitStructure.FilterMode \t\t= CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n\tCAN_FilterInitStructure.FilterScale \t= CAN_FILTERSCALE_32BIT; ///* 32位 */\n\n\tCAN_FilterInitStructure.FilterIdHigh \t\t\t= FILTER_MASK_H(filter_value);  \n\tCAN_FilterInitStructure.FilterIdLow \t\t\t= FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n\tCAN_FilterInitStructure.FilterMaskIdHigh \t= FILTER_MASK_H(filter_mask);\n\tCAN_FilterInitStructure.FilterMaskIdLow \t= FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\n\tCAN_FilterInitStructure.FilterFIFOAssignment \t= CAN_FILTER_FIFO0;  ///* 能够通过该过滤器的报文存到fifo0中 */\n\tCAN_FilterInitStructure.FilterActivation = ENABLE;\n\tHAL_CAN_ConfigFilter(&hcan,&CAN_FilterInitStructure);\n\t \n\t /*===========================安卓-->cc 过滤器=============================*/\n  //广播包过滤\n  CAN_FilterInitStructure.FilterBank  = 3;     /* 过滤器组 */\n  CAN_FilterInitStructure.FilterMode    = CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n  CAN_FilterInitStructure.FilterScale   = CAN_FILTERSCALE_32BIT; ///* 32位 */\n   \n  CAN_FilterInitStructure.FilterIdHigh      = FILTER_MASK_H(filter_value);  \n  CAN_FilterInitStructure.FilterIdLow       = FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n  CAN_FilterInitStructure.FilterMaskIdHigh  = FILTER_MASK_H(filter_mask);\n  CAN_FilterInitStructure.FilterMaskIdLow   = FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n    \n  CAN_FilterInitStructure.FilterFIFOAssignment  = CAN_FILTER_FIFO1;  ///* 能够通过该过滤器的报文存到fifo0中 */\n  CAN_FilterInitStructure.FilterActivation = ENABLE;\n  HAL_CAN_ConfigFilter(&hcan2,&CAN_FilterInitStructure);\n   \n  /*===========================安卓-->cc 过滤器=============================*/\n  //cc包过滤\n   filter_value = MUTIL_MASTER_FILTERID;\n   filter_mask = MUTIL_MASTER_MASK0;\n     \n  \n  CAN_FilterInitStructure.FilterBank  = 4;     /* 过滤器组 */\n  CAN_FilterInitStructure.FilterMode    = CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n  CAN_FilterInitStructure.FilterScale   = CAN_FILTERSCALE_32BIT; ///* 32位 */\n   \n  CAN_FilterInitStructure.FilterIdHigh      = FILTER_MASK_H(filter_value);  \n  CAN_FilterInitStructure.FilterIdLow       = FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n  CAN_FilterInitStructure.FilterMaskIdHigh  = FILTER_MASK_H(filter_mask);\n  CAN_FilterInitStructure.FilterMaskIdLow   = FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n    \n  CAN_FilterInitStructure.FilterFIFOAssignment  = CAN_FILTER_FIFO1;  ///* 能够通过该过滤器的报文存到fifo0中 */\n  CAN_FilterInitStructure.FilterActivation = ENABLE;\n  HAL_CAN_ConfigFilter(&hcan2,&CAN_FilterInitStructure);\n  \n  //安卓-->餐格包过滤\n   filter_value = MUTIL_MASTER_FILTERID;\n   filter_mask = MUTIL_MASTER_MASK1;\n  \n  CAN_FilterInitStructure.FilterBank  = 5;     /* 过滤器组 */\n  CAN_FilterInitStructure.FilterMode    = CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n  CAN_FilterInitStructure.FilterScale   = CAN_FILTERSCALE_32BIT; ///* 32位 */\n\n  CAN_FilterInitStructure.FilterIdHigh      = FILTER_MASK_H(filter_value);  \n  CAN_FilterInitStructure.FilterIdLow       = FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n  CAN_FilterInitStructure.FilterMaskIdHigh  = FILTER_MASK_H(filter_mask);\n  CAN_FilterInitStructure.FilterMaskIdLow   = FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\n  CAN_FilterInitStructure.FilterFIFOAssignment  = CAN_FILTER_FIFO1;  ///* 能够通过该过滤器的报文存到fifo0中 */\n  CAN_FilterInitStructure.FilterActivation = ENABLE;\n  HAL_CAN_ConfigFilter(&hcan2,&CAN_FilterInitStructure);\n\t\n\t//CAN1->IER |= CAN_IT_BOF|CAN_IT_FMP0|CAN_IT_ERR;\n\t__HAL_CAN_ENABLE_IT(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);\t//FIFO0消息挂起中断允许.\t \n\t//__HAL_CAN_ENABLE_IT(&hcan, CAN_IT_RX_FIFO1_MSG_PENDING);\t//FIFO0消息挂起中断允许.\t\n\n  //__HAL_CAN_ENABLE_IT(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);  //FIFO0消息挂起中断允许.   \n  __HAL_CAN_ENABLE_IT(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);  //FIFO0消息挂起中断允许.  \n//  HAL_NVIC_SetPriority(CAN1_RX0_IRQn,1,2);    \t//抢占优先级1，子优先级2\n//  HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);          \t//使能中断\n\t  \n\t\t\n\tHAL_CAN_Start(&hcan);\n\tHAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);\n\tHAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO1_MSG_PENDING);\n\n  HAL_CAN_Start(&hcan2);\n  HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);\n  HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);\n\n  /* USER CODE END CAN_Init 2 */\n\n}\n\n/**\n  * @brief SPI1 Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_SPI1_Init(void)\n{\n\n  /* USER CODE BEGIN SPI1_Init 0 */\n\n  /* USER CODE END SPI1_Init 0 */\n\n  /* USER CODE BEGIN SPI1_Init 1 */\n\n  /* USER CODE END SPI1_Init 1 */\n  /* SPI1 parameter configuration*/\n  hspi1.Instance = SPI1;\n  hspi1.Init.Mode = SPI_MODE_MASTER;\n  hspi1.Init.Direction = SPI_DIRECTION_2LINES;\n  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;\n  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;\n  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;\n  hspi1.Init.NSS = SPI_NSS_SOFT;\n  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;\n  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;\n  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;\n  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\n  hspi1.Init.CRCPolynomial = 10;\n  if (HAL_SPI_Init(&hspi1) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN SPI1_Init 2 */\n\t__HAL_SPI_ENABLE(&hspi1);\n  /* USER CODE END SPI1_Init 2 */\n\n}\n\n/**\n  * @brief SPI2 Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_SPI2_Init(void)\n{\n\n  /* USER CODE BEGIN SPI2_Init 0 */\n\n  /* USER CODE END SPI2_Init 0 */\n\n  /* USER CODE BEGIN SPI2_Init 1 */\n\n  /* USER CODE END SPI2_Init 1 */\n  /* SPI2 parameter configuration*/\n  hspi2.Instance = SPI2;\n  hspi2.Init.Mode = SPI_MODE_MASTER;\n  hspi2.Init.Direction = SPI_DIRECTION_2LINES;\n  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;\n  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;\n  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;\n  hspi2.Init.NSS = SPI_NSS_SOFT;\n  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;\n  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;\n  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;\n  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\n  hspi2.Init.CRCPolynomial = 10;\n  if (HAL_SPI_Init(&hspi2) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN SPI2_Init 2 */\n\t__HAL_SPI_ENABLE(&hspi2);\n  /* USER CODE END SPI2_Init 2 */\n\n}\n\n/**\n  * @brief USART1 Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_USART1_UART_Init(void)\n{\n\n  /* USER CODE BEGIN USART1_Init 0 */\n\n  /* USER CODE END USART1_Init 0 */\n\n  /* USER CODE BEGIN USART1_Init 1 */\n\n  /* USER CODE END USART1_Init 1 */\n  huart1.Instance = USART1;\n  huart1.Init.BaudRate = 115200;\n  huart1.Init.WordLength = UART_WORDLENGTH_8B;\n  huart1.Init.StopBits = UART_STOPBITS_1;\n  huart1.Init.Parity = UART_PARITY_NONE;\n  huart1.Init.Mode = UART_MODE_TX_RX;\n  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;\n  huart1.Init.OverSampling = UART_OVERSAMPLING_16;\n  if (HAL_UART_Init(&huart1) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN USART1_Init 2 */\n\t__HAL_UART_ENABLE(&huart1);\n  /* USER CODE END USART1_Init 2 */\n}\n\n/**\n  * @brief GPIO Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_GPIO_Init(void)\n{\n  GPIO_InitTypeDef GPIO_InitStruct = {0};\n\n  /* GPIO Ports Clock Enable */\n  __HAL_RCC_GPIOC_CLK_ENABLE();\n  __HAL_RCC_GPIOD_CLK_ENABLE();\n  __HAL_RCC_GPIOA_CLK_ENABLE();\n  __HAL_RCC_GPIOB_CLK_ENABLE();\n\n  /*Configure GPIO pin Output Level */\n  HAL_GPIO_WritePin(MAIN_LED_GPIO_Port, MAIN_LED_Pin, GPIO_PIN_RESET);\n\n  /*Configure GPIO pin Output Level */\n  HAL_GPIO_WritePin(GPIOA, LOAD_ACT_0_Pin|LOAD_ACT_1_Pin|LOAD_ACT_2_Pin|LOAD_ACT_3_Pin \n                          |LOAD_ACT_4_Pin|LOAD_ACT_5_Pin|LOAD_ACT_6_Pin|LOAD_ACT_7_Pin \n                          |LOAD_ACT_8_Pin|LOAD_ACT_9_Pin|LOAD_ACT_10_Pin|LOAD_ACT_11_Pin \n                          |AS10_SDN_1_Pin|AS10_CS_1_Pin, GPIO_PIN_RESET);\n\n  /*Configure GPIO pin Output Level */\n  HAL_GPIO_WritePin(GPIOB, BEEP_Pin|AS10_SDN_2_Pin|AS10_CS_2_Pin, GPIO_PIN_RESET);\n\n  /*Configure GPIO pin : MAIN_LED_Pin */\n  GPIO_InitStruct.Pin = MAIN_LED_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\n  HAL_GPIO_Init(MAIN_LED_GPIO_Port, &GPIO_InitStruct);\n\n  /*Configure GPIO pins : LOAD_ACT_0_Pin LOAD_ACT_1_Pin LOAD_ACT_2_Pin LOAD_ACT_3_Pin \n                           LOAD_ACT_4_Pin LOAD_ACT_5_Pin LOAD_ACT_6_Pin LOAD_ACT_7_Pin \n                           LOAD_ACT_8_Pin LOAD_ACT_9_Pin LOAD_ACT_10_Pin LOAD_ACT_11_Pin \n                           AS10_SDN_1_Pin AS10_CS_1_Pin */\n  GPIO_InitStruct.Pin = LOAD_ACT_0_Pin|LOAD_ACT_1_Pin|LOAD_ACT_2_Pin|LOAD_ACT_3_Pin \n                          |LOAD_ACT_4_Pin|LOAD_ACT_5_Pin|LOAD_ACT_6_Pin|LOAD_ACT_7_Pin \n                          |LOAD_ACT_8_Pin|LOAD_ACT_9_Pin|LOAD_ACT_10_Pin|LOAD_ACT_11_Pin \n                          |AS10_SDN_1_Pin|AS10_CS_1_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\n  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\n\n  /*Configure GPIO pins : AS10_IRQ_1_Pin AS10_IRQ_2_Pin */\n  GPIO_InitStruct.Pin = AS10_IRQ_1_Pin|AS10_IRQ_2_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;\n  GPIO_InitStruct.Pull = GPIO_PULLUP;\n  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);\n\n  /*Configure GPIO pins : BEEP_Pin AS10_SDN_2_Pin AS10_CS_2_Pin */\n  GPIO_InitStruct.Pin = BEEP_Pin|AS10_SDN_2_Pin|AS10_CS_2_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\n  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);\n\n  /* EXTI interrupt init*/\n  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);\n  HAL_NVIC_EnableIRQ(EXTI0_IRQn);\n\n  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);\n  HAL_NVIC_EnableIRQ(EXTI1_IRQn);\n\n}\n\n/* USER CODE BEGIN 4 */\n\n/* USER CODE END 4 */\n\n/**\n  * @brief  This function is executed in case of error occurrence.\n  * @retval None\n  */\nvoid Error_Handler(void)\n{\n  /* USER CODE BEGIN Error_Handler_Debug */\n  /* User can add his own implementation to report the HAL error return state */\n\n  /* USER CODE END Error_Handler_Debug */\n}\n\n#ifdef  USE_FULL_ASSERT\n/**\n  * @brief  Reports the name of the source file and the source line number\n  *         where the assert_param error has occurred.\n  * @param  file: pointer to the source file name\n  * @param  line: assert_param error line source number\n  * @retval None\n  */\nvoid assert_failed(uint8_t *file, uint32_t line)\n{ \n  /* USER CODE BEGIN 6 */\n  /* User can add his own implementation to report the file name and line number,\n     tex: printf(\"Wrong parameters value: file %s on line %d\\r\\n\", file, line) */\n  /* USER CODE END 6 */\n}\n#endif /* USE_FULL_ASSERT */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/\n\n/*==================================================================================\n* 函 数 名： bsp_init\n* 参    数： None\n* 功能描述:  板级初始化\n* 返 回 值： None\n* 备    注： \n* 作    者： xiaozh\n* 创建时间： 2019-09-17 121426\n==================================================================================*/\nvoid bsp_init(void)\n{\n\tMX_GPIO_Init();\n\tMX_CAN_Init();\n\tMX_SPI1_Init();\n\t//MX_SPI2_Init();\n\tMX_USART1_UART_Init();\n\t__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);    //使能接收中断\n}\n",
+			"file": "Hardware/src/bsp_init.c",
+			"file_size": 15519,
+			"file_write_time": 132477347151069892,
+			"settings":
+			{
+				"buffer_size": 14833,
+				"encoding": "Western (Windows 1252)",
+				"line_ending": "Windows",
+				"scratch": true
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"raw",
+				"Raw Line Edit: View Line Endings"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"RawL",
+				"Package Control: Upgrade/Overwrite All Packages"
+			],
+			[
+				"Packages Control",
+				"Package Control: Satisfy Dependencies"
+			],
+			[
+				"wor",
+				"WordHighlight: Toggle Enabled"
+			],
+			[
+				"i",
+				"Package Control: Install Package"
+			],
+			[
+				"word",
+				"Word Wrap: Toggle"
+			],
+			[
+				"",
+				"About"
+			],
+			[
+				"INSTA",
+				"Package Control: Install Package"
+			],
+			[
+				"CO",
+				"ConvertToUTF8: Reload with Encoding"
+			],
+			[
+				"INSTALL PACKAGE",
+				"Package Control: Install Package"
+			],
+			[
+				"COV",
+				"ConvertToUTF8: Reload with Encoding"
+			],
+			[
+				"CONVER",
+				"ConvertToUTF8: Reload with Encoding"
+			],
+			[
+				"inst",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 178.0,
+		"history":
+		[
+			"import urllib.request,os,hashlib; h = '7183a2d3e96f11eeadd761d777e62404' + 'e330c659d4bb41d3bdf022e94cab3cd0'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://packagecontrol.io/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by)",
+			"import urllib.request,os; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); open(os.path.join(ipp, pf), 'wb').write(urllib.request.urlopen( 'http://sublime.wbond.net/' + pf.replace(' ','%20')).read())",
+			"import urllib.request,os,hashlib; h = 'eb2297e1a458f27d836c04bb0cbaf282' + 'd0e7a3098092775ccb37ca9d6b2e4b7d'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://packagecontrol.io/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by) "
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2/Application",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2/Application/src",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2/Hardware",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2/Hardware/src",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2/Src"
+	],
+	"file_history":
+	[
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN_V2/Hardware/src/bsp_init.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Hardware/src/load_gpio.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_can.h",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Drivers/STM32F1xx_HAL_Driver/Inc/Legacy/stm32f1xx_hal_can_legacy.h",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Hardware/inc/can_drv.h",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/event_manage/src/serial_def_fifo.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Hardware/src/bsp_init.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Hardware/src/bsb_init.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f103x6.h",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f105xc.h",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_can.c",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/HARDWARE/ISO15693_rec.c",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/HARDWARE/ISO15693_cmd.h",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/HARDWARE/bsp_data.c",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/USER/main.c",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/HARDWARE/bsp_spi.c",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/HARDWARE/bsp_timer.c",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/OBJ/main.crf",
+		"/Users/jack/Desktop/meican/smartTableAFE_APP/USER/samrtTableAFE_APP.uvprojx",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/Application/inc/comm_can.h",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/event_manage/src/uart_debug.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/event_manage/src/si_fifo.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/event_manage/src/si_def_fifo.c",
+		"/Users/jack/Desktop/meican/W2项目资料/RADIO_CAN/event_manage/src/mini_dispatch.c",
+		"/Users/jack/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/2.0b4.0.9/0f0049b9a43e45e6cdfd390cba50c73b/Message/MessageTemp/9e20f478899dc29eb19741386f9343c8/File/can/can_receive.c",
+		"/Users/jack/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/2.0b4.0.9/0f0049b9a43e45e6cdfd390cba50c73b/Message/MessageTemp/9a779848f5caeb4e49b6db7f44fc065a/File/CanSocket.cpp",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/Test/Test.c",
+		"/Users/jack/Downloads/灰太狼暂定升级协议初级版20200720-V6.0 - APP -测试总线成功升级成功升级成功报警关掉AD总线中断最高升级更改goto/灰太狼/W2E/Lock_Control/app/STM32F10x_FWLib/inc/stm32f10x_flash.h",
+		"/Users/jack/Desktop/meican/W2E/Lock_Control/common/IAP_Utility/IAP_Core.h",
+		"/Users/jack/Desktop/meican/W2E/Lock_Control/app/USER/main.c",
+		"/Users/jack/Desktop/meican/W2E/Lock_Control/app/HARDWARE/bsp_uart.h",
+		"/Users/jack/Desktop/meican/W2E/Lock_Control/app/CORE/core_cm0.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/ST7789V/ST7789V.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/UserData/UserData.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/UserData/UserData.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/IFLASH/IFLASH.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/QRCode/QRCode.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/UI/UI.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/CY8CMBR3XXX/API/CY8CMBR3xxx.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/GT32L32/GT32L32.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/GT32L32/GT32L32S0140.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/OBJ/SPI.map",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/UI/UIResource.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/IFLASH/IFLASH.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/UI/untitled.cpp",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/Menu/Menu.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/Touch/Touch.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/GT32L32/GT32L32.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/Menu/Menu.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/Protocol/Protocol.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/CY8CMBR3XXX/API/CY8CMBR3xxx.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/common/STM32/Src/timer.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/Touch/Touch.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/USER/main.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/ST25R3911/Inc/platform.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/APP/UI/UI.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/CY8CMBR3XXX/API/CY8CMBR3xxx_HostFunctions.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/GT32L32/GT32L32M1080.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/FWLIB/src/stm32f4xx_spi.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/common/STM32/Src/spi.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/FWLIB/inc/stm32f4xx_spi.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/QRCode/QRCode.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/uart/bsp_uart3.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/FWLIB/inc/stm32f4xx_rcc.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/ST7789V/ST7789V.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/uart/bsp_uart3.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/USER/stm32f4xx.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/FWLIB/src/stm32f4xx_usart.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/uart/usart.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/uart/my_usart.c",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/uart/my_usart.h",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/uart/usart.c",
+		"/Users/jack/Library/Application Support/Sublime Text 3/Packages/WordHighlight/Default (OSX).sublime-keymap",
+		"/Users/jack/Desktop/meican/Writer/Writer/SYSTEM/MyUtils/MyUtils.c",
+		"/Users/jack/Library/Application Support/Sublime Text 3/Packages/User/Word Highlight.sublime-settings",
+		"/Users/jack/Desktop/meican/Writer/Writer/USER/SPI.uvoptx",
+		"/Users/jack/Desktop/meican/Writer/Writer/HARDWARE/CY8CMBR3XXX/API/CY8CMBR3xxx_APIs.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/SYSTEM/RFID/RFID.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/APP/UI/UI.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/SYSTEM/Protocol/Protocol.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/SYSTEM/UserData/UserData.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/SYSTEM/Touch/Touch.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/HARDWARE/LED/LED.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/USER/main.c",
+		"/Users/jack/Desktop/美餐/写卡器/Writer/FWLIB/src/stm32f4xx_rcc.c",
+		"/Users/jack/Library/Application Support/Sublime Text 3/Packages/User/Preferences.sublime-settings",
+		"/Users/jack/Library/Application Support/Sublime Text 3/Packages/Default/Preferences.sublime-settings"
+	],
+	"find":
+	{
+		"height": 32.0
+	},
+	"find_in_files":
+	{
+		"height": 116.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": true,
+		"find_history":
+		[
+			"hcan"
+		],
+		"highlight": false,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": true,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": true,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 2,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "Application/src/interface.c",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 6762,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"in_converting": true,
+							"origin_content": "#include \"interface.h\"\n#include \"includes.h\" \n \n \nextern _App_Param mApp_Param;\n\n/*==================================================================================\n* 函 数 名： inter_init\n* 参    数： None\n* 功能描述:  接口协议初始化\n* 返 回 值： None\n* 备    注： 默认间隔10ms进行接收数据解析\n* 作    者： xiaozh\n* 创建时间： 2019-09-23 180348\n==================================================================================*/\nvoid inter_init(void)\n{  \n\t\n}\n\n/*==================================================================================\n* 函 数 名： read_config_param\n* 参    数： _pApp_Config_Param\n* 功能描述:  读取配置参数\n* 返 回 值： None\n* 备    注： \n* 作    者： xiaozh\n* 创建时间： 2019-09-06 115746\n==================================================================================*/\nuint8_t read_config_param(void* c_param)\n{\n\t_pApp_Param pmsg = c_param;\n\t\n\tpFunc_Func->read(APP_CONFIG_ADDR, pmsg->config_param.flash_buff, MAX_USE_FLASH_SIZE*2);\t//读取参数\n\t\n\t//判断参数是否合法\n\tif(crc32(pmsg->config_param.flash_buff, pmsg->config_param._Use_Param.crc_data_len) == pmsg->config_param._Use_Param.crc32)\t//判断校验是否合法\n\t{\n\t\t//判断每一项参数是否合法\n\t\tif(pmsg->config_param._Use_Param.radio_addr == ((~pmsg->config_param._Use_Param.radio_addr_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->si_rx_addr = pmsg->config_param._Use_Param.radio_addr;\n\t\t}\n\t\t\n\t\tif(pmsg->config_param._Use_Param.ms_radio_addr == ((~pmsg->config_param._Use_Param.ms_radio_addr_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->ms_si_rx_addr = pmsg->config_param._Use_Param.ms_radio_addr;\n\t\t}\n\t\t\n\t\tif(pmsg->config_param._Use_Param.hard_ver == ((~pmsg->config_param._Use_Param.hard_ver_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->hard_ver = pmsg->config_param._Use_Param.hard_ver;\n\t\t}\n\t\t\n\t\tif(pmsg->config_param._Use_Param.base_channel_num == ((~pmsg->config_param._Use_Param.base_channel_num_n)&0x000000FF))\n\t\t{\n\t\t\tpmsg->si_base_num = pmsg->config_param._Use_Param.base_channel_num;\n\t\t}\n\t\t  \n\t}\n\telse\n\t{\n\t\t//校验出错使用默认配置参数\n\t\tpmsg->si_base_num = SI_BASE_CHANNLE_NUM;\n\t\tpmsg->si_rx_addr = SI_SLAVE_RX_ADDDR;\n\t\tpmsg->ms_si_rx_addr = SI_MASTER_RX_ADDR; \n\t}\n\treturn 0;\n}\n \n/*==================================================================================\n* 函 数 名： si_sed_loop_task\n* 参    数： None\n* 功能描述:  si4463自动发包，定时50\n* 返 回 值： None\n* 备    注： 循环检测缓存，如果有数据则进行发送\n* 作    者： xiaozh\n* 创建时间： 2019-09-17 122635\n==================================================================================*/ \nvoid si_sed_loop_check(void* const instance)\n{ \n\tuint8_t cur_index = 0;\n\t_pSi446x_Instance pthis = instance;\n\t_pSi_Fifo pmsg = pthis->sed_fifo; \n\n\t//检查缓存是否为空\n\tif((cur_index = si_fifo_get(pthis->sed_fifo, 0)) == 0xFF)\n\t{\n\t\tgoto error;\n\t}\n\t \n\t//不为空这发送缓存中的数据 \n\tsi446x_sed_long_message(instance, pmsg->item[cur_index].pkt_buff.ip.channel,  pmsg->item[cur_index].pkt_buff.ip.match, pmsg->item[cur_index].pkt_buff.buff,  pmsg->item[cur_index].pkt_buff.lenght);\n\t \n\t//等待发送完成\n\t\n\t//标记已经发送，等待响应，标记缓存为已发送，未确定响应\n\t\n\t//释放缓存数据\n\tsi_fifo_free_item(pmsg, cur_index);\n\t\n\terror:\n\t  __NOP();\n}\n  \n/*==================================================================================\n* 函 数 名： can_rev_decode\n* 参    数： None\n* 功能描述:  can协议解析\n* 返 回 值： None\n* 备    注： none\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 172557\n==================================================================================*/\nvoid can_rev_decode(void)\n{\n\t_Ret_Msg c_msg; \n\t \n\tif(can_pop_one_frame(&c_msg) > 0)\t\t//获取数据\n\t{ \n\t\t//协议解析\n\t\tcan_frame_parse(&c_msg);\t\t\n\t} \n}\n\n/*==================================================================================\n* 函 数 名： can_sed_loop_task\n* 参    数： None\n* 功能描述:  CAN定时发送任务\n* 返 回 值： None\n* 备    注： 默认间隔20ms发送一次\n* 作    者： xiaozh\n* 创建时间： 2019-09-23 180348\n==================================================================================*/\nvoid can_sed_loop_task(void* argv)\n{  \n\tcan_sed_loop_check();\t\n}\n\n/*==================================================================================\n* 函 数 名： HAL_CAN_RxFifo0MsgPendingCallback\n* 参    数： None\n* 功能描述:  接收完成\n* 返 回 值： None\n* 备    注： 短包\n* 作    者：  \n* 创建时间： 2019-09-23 180101\n==================================================================================*/\nvoid HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan1) \n{\n\t_Can_Msg Can_Msg;\n\tCAN_RxHeaderTypeDef mCan_Header;\n\t\n\t//读取数据\n\tHAL_CAN_GetRxMessage(hcan1,CAN_RX_FIFO0, &mCan_Header, (uint8_t*)Can_Msg.data);\n\tCan_Msg.ex_id.EX_ID = mCan_Header.ExtId;\n\tCan_Msg.byte_count = mCan_Header.DLC;\n\t \n\t//拷贝参数 \n\tcan_recv_signal_frame(&Can_Msg);\n\t\n\t//使能中断\n\t__HAL_CAN_ENABLE_IT(hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);\n}\n\n/*==================================================================================\n* 函 数 名： HAL_CAN_RxFifo0MsgPendingCallback\n* 参    数： None\n* 功能描述:  接收完成\n* 返 回 值： None\n* 备    注： 长包\n* 作    者：  \n* 创建时间： 2019-09-23 180101\n==================================================================================*/\nvoid HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan1) \n{\n\t_Can_Msg Can_Msg;\n\tCAN_RxHeaderTypeDef mCan_Header;\n\t\n\t//读取数据\n\tHAL_CAN_GetRxMessage(hcan1,CAN_RX_FIFO1, &mCan_Header, (uint8_t*)Can_Msg.data);\n\tCan_Msg.ex_id.EX_ID = mCan_Header.ExtId;\n\tCan_Msg.byte_count = mCan_Header.DLC;\n\t \n\t//拷贝参数  \n\tcan_recv_mutil_frame(&Can_Msg);\n\t\n\t\t\n//\tdebug_print(\"can_rev irq,\");\n//\tdebug_print(\"ex_id:%4x, \", Can_Msg.ex_id.EX_ID);\n//\tdebug_print(\"lens=%02x, \", Can_Msg.byte_count);\n//\tdebug_print(\"rev_data:\");\n//\tdebug_print_hex(Can_Msg.data, Can_Msg.byte_count);\n//\tdebug_print(\"\\n\");\n\t\n\t//使能中断\n\t__HAL_CAN_ENABLE_IT(hcan1, CAN_IT_RX_FIFO1_MSG_PENDING);\n}\n\nvoid HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)\n{\n\tdebug_print(\"can error\\n\");\n}\n\n\n\n/*==================================================================================\n* 函 数 名： si_sed_buff\n* 参    数： None\n* 功能描述:  si4463发送包\n* 返 回 值： None\n* 备    注： try_time ： =0不需要ACK  >0需要ACK\n* 作    者： xiaozh\n* 创建时间： 2019-10-09 183829\n==================================================================================*/ \nuint8_t si_sed_buff(void *instance, uint8_t to_addr, uint8_t *buff, uint16_t len, uint8_t try_time)\n{  \n\tuint8_t step_count = 0;\n\tuint32_t crc_value= 0;\n\t_Si_Pkt si_pkt;\n\t_pSi446x_Instance pthis = instance;\n\t\n\tsi_pkt.ip.channel = ADDR_TO_CHANNEL(to_addr);\t\t//通过地址计算发送通道\n\tsi_pkt.ip.match = ADDR_TO_MATCH(to_addr);\t\t//通过地址计算发送match\n\n\tsi_pkt.pointer = 0;\n\t \n\tsi_pkt.buff[step_count++] = to_addr;\t//目的地址\n\tsi_pkt.buff[step_count++] = mApp_Param.si_rx_addr;//源地址\n\t\n\tfor(int i=0; i<len; i++)\n\t{\n\t\tsi_pkt.buff[step_count++] = buff[i];\n\t}\n\t\n\tcrc_value = st_crc32(si_pkt.buff, step_count);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>0)&0x000000FF);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>8)&0x000000FF);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>16)&0x000000FF);\n\tsi_pkt.buff[step_count++] = (uint8_t)((crc_value>>24)&0x000000FF);\n\t\n\tsi_pkt.lenght = step_count;\n\tsi_fifo_push(pthis->sed_fifo, &si_pkt, try_time);\t//放入缓存\t\n\treturn 0;\n}\n\n\n\n\n",
+							"origin_encoding": "GB2312",
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 4412.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "Application/src/comm_can.c",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 8953,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								7158,
+								7183
+							]
+						],
+						"settings":
+						{
+							"in_converting": true,
+							"origin_content": "#include \"comm_can.h\" \n#include \"crc.h\"\n#include \"can_def_fifo.h\"\n\nextern CAN_HandleTypeDef hcan;\n\n_Mutil_Ring \t mMutil_Ring[MAX_MUTIL_ITEM_NUM];\t\t//多包接收 \nstatic uint64_t mutil_mark_table[64] = {0};\n\n_Can_Instance mCan_Instance;\n \nstatic _Can_Msg can_sed_fifo[CAN_MAX_CACHE_LEN];\t//can发送缓存\nstatic _Can_Msg can_rev_fifo[CAN_MAX_CACHE_LEN];\t//can接收缓存（单帧）\n\n#define ID_MASK\t\t\t0xFCFFFFFF\n#define COMPARE_ID(ID1, ID2) (((ID1&ID_MASK) == (ID2&ID_MASK))?(1):(0))\t\t//对比两个ID是否相同，长包\n\n/*==================================================================================\n* 函 数 名： can_instance_init\n* 参    数： None\n* 功能描述:  can初始化\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 170617\n==================================================================================*/\nvoid can_instance_init(void)\n{  \n\tmCan_Instance.p_ffunc\t= pCan_Fifo_Func,\n\t//发送接收缓存初始化（单帧） \n\t mCan_Instance.Sed_Fifo = mCan_Instance.p_ffunc->init_m(can_sed_fifo, CAN_MAX_CACHE_LEN);\n\t mCan_Instance.Rcv_Fifo = mCan_Instance.p_ffunc->init_m(can_rev_fifo, CAN_MAX_CACHE_LEN); \n\t\n\t//长帧接收初始化\n\tmCan_Instance.pMutil_Fifo = mMutil_Ring;\n\t\n\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\n\t{\n\t\tmMutil_Ring[i].ex_id.EX_ID = 0;\n\t\tmMutil_Ring[i].in_use = 0;\n\t\tmMutil_Ring[i].is_complete = 0;\n\t\tmMutil_Ring[i].real_mark = 0;\n\t\tmemset(mMutil_Ring[i].r_data, 0, sizeof(mMutil_Ring[i].r_data));\n\t}\n\n\tfor(int i=0; i<64; i++)\n\t{\n\t\tfor(int j=0; j<i+1; j++)\n\t\t{\n\t\t\tmutil_mark_table[i] |= (0x0000000000000001<<j);\t\t//空间换时间\n\t\t}\n\t} \n}\n \n/*==================================================================================\n* 函 数 名： find_avalib_node\n* 参    数： None\n* 功能描述:  查找可以节点\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 161141\n==================================================================================*/\nstatic uint8_t find_null_node(void)\n{\n\t//查询可用空节点索引\n\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\t//从后往前查找可用的ID号\n\t{\n\tif(mMutil_Ring[i].in_use == 0)\n\t\t{\n\t\t\treturn i;\n\t\t}\n\t}\n\n\treturn 0xFF;\t//空，没有可用\n}\n\n/*==================================================================================\n* 函 数 名： delete_item_node\n* 参    数： None\n* 功能描述:  清空节点\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 161141\n==================================================================================*/\nstatic uint8_t delete_item_node(uint8_t index)\n{  \n\t  //清空缓存\n\tmMutil_Ring[index].in_use = 0;\t//删除不合法帧 \n\tmMutil_Ring[index].is_complete = 0;\n\tmMutil_Ring[index].ex_id.EX_ID = 0;\n\tmMutil_Ring[index].real_mark = 0;\n\tmMutil_Ring[index].r_len = 0;\n\treturn 0;\n}\n\n/*==================================================================================\n* 函 数 名： item_is_exist\n* 参    数： None\n* 功能描述:  查看是否已经存在\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 161141\n==================================================================================*/\nstatic uint8_t item_is_exist(uint32_t ex_id)\n{\n\tuint8_t ret_index = 0xFF;\t//返回的节点索引\n\t_pEx_id pmsg = (_pEx_id)&ex_id; \n\t\n\t//查询当前地址是否已经有缓存帧\n\tfor(int j=0; j<MAX_MUTIL_ITEM_NUM; j++)\t//从后往前查找可用的ID号\n\t{ \n\t\tif(COMPARE_ID(mMutil_Ring[j].ex_id.EX_ID , ex_id))\t//判断ID是否相同\n\t\t{\n\t\t\tret_index = j;\n\t\t}\n\t}\n\t\n\t//没有接收完成的包，丢了结尾帧情况\n\tif(ret_index == 0xFF)\n\t{\n\t\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\t//从后往前查找可用的ID号\n\t\t{\n\t\t\tif(mMutil_Ring[i].ex_id._bit.s_addr == pmsg->_bit.s_addr)\t//如果存在相同地址\n\t\t\t{\n\t\t\t\tif((mMutil_Ring[i].is_complete == 0)&&(mMutil_Ring[i].in_use != 0))\t//没有接收完成\n\t\t\t\t{\n\t\t\t\t\t//直接覆盖没有接收完整节点\n\t\t\t\t\tmMutil_Ring[i].ex_id.EX_ID = ex_id;\n\t\t\t\t\tmMutil_Ring[i].real_mark = 0;\n\t\t\t\t\tmMutil_Ring[i].r_len = 0;\n\t\t\t\t\tret_index = i;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\n\treturn ret_index;\t//空，没有可用\n}\n\n/*==================================================================================\n* 函 数 名： can_recv_frame\n* 参    数： _pCan_Msg\n* 功能描述:  can总线数据接收\n* 返 回 值： None\n* 备    注： 在中断\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 154449\n==================================================================================*/\nuint8_t can_recv_mutil_frame(void *can_msg)\n{\n\tuint8_t new_index = 0;\t//申请索引\n\t_pCan_Msg pmsg = can_msg;\n\n\tif(pmsg->ex_id._bit.is_sigle == 0)\t//帧错误\n\t{\n\t\treturn 0x81;\n\t}\n\telse\n\t{\n\t\t//判断当前id是否存在\n\t\tif((new_index = item_is_exist(pmsg->ex_id.EX_ID)) == 0xFF)\n\t\t{\n\t\t\t//不存在，则申请新表\n\t\t\tnew_index = find_null_node(); \n\t\t\t\n\t\t\t//保存到缓存\n\t\t\tmMutil_Ring[new_index].in_use = 0x01;\t//使用中\n\t\t\tmMutil_Ring[new_index].ex_id.EX_ID = pmsg->ex_id.EX_ID;\n\t\t\tmMutil_Ring[new_index].r_len = (pmsg->byte_count-1);\n\t\t\tmemcpy(mMutil_Ring[new_index].r_data, pmsg->data+1, pmsg->byte_count-1);\n\t\t\t//标记接收\n\t\t\tmMutil_Ring[new_index].real_mark = (0x0000000000000001<<pmsg->data[0]);\n\t\t\treturn 0;\n\t\t}\n\t\telse\n\t\t{\n\t\t\t//已经存在\n\t\t\t\n\t\t\t//保存到缓存\n\t\t\tmMutil_Ring[new_index].in_use = 0x01;\t//使用中\n\t\t\tmMutil_Ring[new_index].r_len += (pmsg->byte_count-1);\n\t\t\tmemcpy(mMutil_Ring[new_index].r_data+pmsg->data[0]*7, pmsg->data+1, pmsg->byte_count-1);\t\n\t\t\t//标记接收\n\t\t\tmMutil_Ring[new_index].real_mark |= (0x0000000000000001<<pmsg->data[0]);\n\n\t\t\t//判断是否为末尾帧\n\t\t\tif(pmsg->ex_id._bit.is_sigle == 0x02)\t//末尾帧\n\t\t\t{ \n\t\t\t\tif(mMutil_Ring[new_index].real_mark == mutil_mark_table[pmsg->data[0]])\n\t\t\t\t{ \n\t\t\t\t\tmMutil_Ring[new_index].is_complete = 0x01;\t//接收完成\n\t\t\t\t\tmMutil_Ring[new_index].ex_id._bit.is_sigle = 0x03;\t//接收完成\n\t\t\t\t\t//CRC校验留在协议解析，防止过多占用中断\n\t\t\t\t\tprintf(\"rev complete\\n\");\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{  \n\t\t\t\t\t//清空节点\n\t\t\t\t\tdelete_item_node(new_index);\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n\t \n\treturn 0;\n}\n \n/*==================================================================================\n* 函 数 名： can_recv_frame\n* 参    数： _pCan_Msg\n* 功能描述:  can总线数据接收\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 154449\n==================================================================================*/\nuint8_t can_recv_signal_frame(void *can_msg)\n{  \n\tmCan_Instance.p_ffunc->push(mCan_Instance.Rcv_Fifo, can_msg);\n\t\n\treturn 0;\n}\n\n/*==================================================================================\n* 函 数 名： can_pop_one_frame\n* 参    数： _pRet_Msg\n* 功能描述:  can总线数据接收\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 154449\n==================================================================================*/ \nuint8_t can_pop_one_frame(void *ret_msg)\n{\n\t_pRet_Msg pmsg = ret_msg;\n\t\n\t//先查询长帧\n\tfor(int i=0; i<MAX_MUTIL_ITEM_NUM; i++)\t//从后往前查找可用的ID号\n\t{\n\t\tif(mMutil_Ring[i].is_complete == 0x01)\n\t\t{\n\t\t\tpmsg->ex_id.EX_ID = mMutil_Ring[i].ex_id.EX_ID;\n\t\t\tpmsg->byte_count = mMutil_Ring[i].r_len;\n\t\t\tmemcpy(pmsg->data, mMutil_Ring[i].r_data,  mMutil_Ring[i].r_len);\n\n\t\t\t//清空节点\n\t\t\tdelete_item_node(i);\n\t\t\treturn pmsg->byte_count;\n\t\t}\n\t}\n\t\n\t//查询短帧 \n\tif(\tmCan_Instance.p_ffunc->pop(mCan_Instance.Rcv_Fifo, ret_msg) != 0) \n\t{\n\t\t//查找成功\n\t\treturn pmsg->byte_count;\n\t}\n\t\n\treturn 0;\n}\n\n/*==================================================================================\n* 函 数 名： can_sed_loop_check\n* 参    数： None\n* 功能描述:  CAN循环检测是否有发送的数据\n* 返 回 值： None\n* 备    注： None\n* 作    者： xiaozh\n* 创建时间： 2019-10-28 171529\n==================================================================================*/\nvoid can_sed_loop_check(void)\n{\n\t_Can_Msg can_msg;\n\n\t//检查是否为空\n\tif(mCan_Instance.p_ffunc->is_empty(mCan_Instance.Sed_Fifo))\t//如果不为空\n\t{\n\t\t//屏蔽全局中断\n\t\t\n\t\t//获取数据\n\t\tmCan_Instance.p_ffunc->pop(mCan_Instance.Sed_Fifo, &can_msg);\n\t\t//开启全局中断\n\n\t\t//发送数据\n\t\tcan_sed_pkg_without_cache(&can_msg);\n\t}\n}\n\n/*==================================================================================\n* 函 数 名： can_sed_link_pkg\n* 参    数： None\n* 功能描述:  发送连包\n* 返 回 值： None\n* 备    注： \n* 作    者：  xiaozh\n* 创建时间： 2019-09-25 162917\n==================================================================================*/\nuint8_t can_sed_link_pkg(uint8_t host_cmd, uint8_t d_addr, uint8_t* buff, uint16_t len)\n{\n\t_Can_Msg c_msg;\n\tuint8_t count = 1;\n\tuint8_t pkg_step = 0;\n\tuint16_t s_len = len;\n\tuint16_t crc16_result = 0;\n\tuint8_t sed_buff[256] = {0};\n\t \n\tif(s_len > 254*7)\n\t{\n//\t\tdebug_print(\"超过can总线最大发包能力\\n\");\n\t\treturn 0x81;\n\t}\n\t\n\tc_msg.ex_id.EX_ID = 0;\n\tc_msg.ex_id._bit.d_addr = d_addr;\n\tc_msg.ex_id._bit.s_addr = CAN_MASTER_ADDR;\n\tc_msg.ex_id._bit.png_cmd = host_cmd;\t\n\t\n\t//判断是否连包\n\tif(s_len <= 8)\n\t{\n\t\tc_msg.byte_count = s_len;\n\t\tmemset(c_msg.data, 0, 8);\n\t\tfor(int j=0; j<s_len; j++)\n\t\t{\n\t\t\tc_msg.data[j] = buff[j]; \n\t\t}\n\t\t\n\t\tmCan_Instance.p_ffunc->push(mCan_Instance.Sed_Fifo, &c_msg); \n\t}\n\telse\n\t{ \n\t\tc_msg.ex_id._bit.is_sigle = 0x01;\t\t//连包数据\n\t\ts_len = len+2;\t//增加CRC16\n\t\t\n\t\tmemcpy(sed_buff, buff, len);\n\t\t//计算CRC16\n\t\tcrc16_result = crc16_ccitt(buff, len);\n\n\t\tsed_buff[len] = (uint8_t)((crc16_result>>0)&0x00FF); \n\t\tsed_buff[len+1] = (uint8_t)((crc16_result>>8)&0x00FF); \n\t\t \n\t\twhile(s_len > 0)\n\t\t{\n\t\t\tcount = 0x01;\n\t\t\tc_msg.data[0] = pkg_step++;\n\n\t\t\t//判断是否为最后一帧数据 \n\t\t\tif(s_len  <= 7)\n\t\t\t{\n\t\t\t\tc_msg.byte_count = s_len+1;\n\t\t\t\tc_msg.ex_id._bit.is_sigle = 0x02;\t\t//连包结尾数据\n\t\t\t}\n\t\t\telse\n\t\t\t{\n\t\t\t\tc_msg.byte_count = 8; \n\t\t\t}\n\t\t\t \n\t\t\tfor(int j=0; j<c_msg.byte_count; j++)\n\t\t\t{\n\t\t\t\tc_msg.data[count++] = sed_buff[(pkg_step-1)*7+j]; \n\t\t\t} \n\t\t\t\n\t\t\ts_len -= (c_msg.byte_count-1);\n \n\t\t\t//填充数据 \n\t\t\tmCan_Instance.p_ffunc->push(mCan_Instance.Sed_Fifo, &c_msg);\n\t\t}\n\t}\n\n\treturn 0;\n}\n \n",
+							"origin_encoding": "GB2312",
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 5583.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "Hardware/src/bsp_init.c",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 14833,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								192,
+								192
+							]
+						],
+						"settings":
+						{
+							"in_converting": true,
+							"origin_content": "#include \"bsp_init.h\"\n#include \"can_drv.h\"\n\n#include \"main.h\"\n\nCAN_HandleTypeDef hcan;\nCAN_HandleTypeDef hcan2;\n\nSPI_HandleTypeDef hspi1;\nSPI_HandleTypeDef hspi2;\n\nUART_HandleTypeDef huart1;\n\n/**\n  * @brief CAN Initialization Function\n  * @param None\n  * @retval None\n  */\n\t\nstatic void MX_CAN_Init(void)\n{\n\tuint32_t filter_value = SIGNAL_MASTER_FILTERID;\n\tuint32_t filter_mask = SIGNAL_MASTER_MASK;\n\n  /* USER CODE BEGIN CAN_Init 0 */\n\n\tCAN_FilterTypeDef CAN_FilterInitStructure;\n  /* USER CODE END CAN_Init 0 */\n\n  /* USER CODE BEGIN CAN_Init 1 */\n\n  /* USER CODE END CAN_Init 1 */\n  hcan.Instance = CAN1;\n  hcan.Init.Prescaler = 16;\n  hcan.Init.Mode = CAN_MODE_NORMAL;\n  hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;\n  hcan.Init.TimeSeg1 = CAN_BS1_1TQ;\n  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;\n  hcan.Init.TimeTriggeredMode = DISABLE;\n  hcan.Init.AutoBusOff = DISABLE;\n  hcan.Init.AutoWakeUp = DISABLE;\n  hcan.Init.AutoRetransmission = DISABLE;\n  hcan.Init.ReceiveFifoLocked = DISABLE;\n  hcan.Init.TransmitFifoPriority = DISABLE;\n  if (HAL_CAN_Init(&hcan) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN CAN_Init 2 */\n  hcan2.Instance = CAN2;\n  hcan2.Init.Prescaler = 16;\n  hcan2.Init.Mode = CAN_MODE_NORMAL;\n  hcan2.Init.SyncJumpWidth = CAN_SJW_1TQ;\n  hcan2.Init.TimeSeg1 = CAN_BS1_1TQ;\n  hcan2.Init.TimeSeg2 = CAN_BS2_1TQ;\n  hcan2.Init.TimeTriggeredMode = DISABLE;\n  hcan2.Init.AutoBusOff = DISABLE;\n  hcan2.Init.AutoWakeUp = DISABLE;\n  hcan2.Init.AutoRetransmission = DISABLE;\n  hcan2.Init.ReceiveFifoLocked = DISABLE;\n  hcan2.Init.TransmitFifoPriority = DISABLE;\n  if (HAL_CAN_Init(&hcan2) != HAL_OK)\n  {\n    Error_Handler();\n  }\n\n\t/*===========================FIFO0 过滤=============================*/\n\t//单包接收\n\tCAN_FilterInitStructure.FilterBank \t= 0;     /* 过滤器组 */\n\tCAN_FilterInitStructure.FilterMode \t\t= CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n\tCAN_FilterInitStructure.FilterScale \t= CAN_FILTERSCALE_32BIT; ///* 32位 */\n\t \n\tCAN_FilterInitStructure.FilterIdHigh \t\t\t= FILTER_MASK_H(filter_value);  \n\tCAN_FilterInitStructure.FilterIdLow \t\t\t= FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n\tCAN_FilterInitStructure.FilterMaskIdHigh \t= FILTER_MASK_H(filter_mask);\n\tCAN_FilterInitStructure.FilterMaskIdLow \t= FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\t  \n\tCAN_FilterInitStructure.FilterFIFOAssignment \t= CAN_FILTER_FIFO0;  ///* 能够通过该过滤器的报文存到fifo0中 */\n\tCAN_FilterInitStructure.FilterActivation = ENABLE;\n\tHAL_CAN_ConfigFilter(&hcan,&CAN_FilterInitStructure);\n\t \n\t/*===========================FIFO1 过滤=============================*/\n\t//多包接收\n\t//过滤组 \n\t filter_value = MUTIL_MASTER_FILTERID;\n\t filter_mask = MUTIL_MASTER_MASK0;\n\t\t \n\t\n\tCAN_FilterInitStructure.FilterBank \t= 1;     /* 过滤器组 */\n\tCAN_FilterInitStructure.FilterMode \t\t= CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n\tCAN_FilterInitStructure.FilterScale \t= CAN_FILTERSCALE_32BIT; ///* 32位 */\n\t \n\tCAN_FilterInitStructure.FilterIdHigh \t\t\t= FILTER_MASK_H(filter_value);  \n\tCAN_FilterInitStructure.FilterIdLow \t\t\t= FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n\tCAN_FilterInitStructure.FilterMaskIdHigh \t= FILTER_MASK_H(filter_mask);\n\tCAN_FilterInitStructure.FilterMaskIdLow \t= FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\t  \n\tCAN_FilterInitStructure.FilterFIFOAssignment \t= CAN_FILTER_FIFO0;  ///* 能够通过该过滤器的报文存到fifo0中 */\n\tCAN_FilterInitStructure.FilterActivation = ENABLE;\n\tHAL_CAN_ConfigFilter(&hcan,&CAN_FilterInitStructure);\n\t\n\t//过滤组\n\t filter_value = MUTIL_MASTER_FILTERID;\n\t filter_mask = MUTIL_MASTER_MASK1;\n\t\n\tCAN_FilterInitStructure.FilterBank \t= 2;     /* 过滤器组 */\n\tCAN_FilterInitStructure.FilterMode \t\t= CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n\tCAN_FilterInitStructure.FilterScale \t= CAN_FILTERSCALE_32BIT; ///* 32位 */\n\n\tCAN_FilterInitStructure.FilterIdHigh \t\t\t= FILTER_MASK_H(filter_value);  \n\tCAN_FilterInitStructure.FilterIdLow \t\t\t= FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n\tCAN_FilterInitStructure.FilterMaskIdHigh \t= FILTER_MASK_H(filter_mask);\n\tCAN_FilterInitStructure.FilterMaskIdLow \t= FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\n\tCAN_FilterInitStructure.FilterFIFOAssignment \t= CAN_FILTER_FIFO0;  ///* 能够通过该过滤器的报文存到fifo0中 */\n\tCAN_FilterInitStructure.FilterActivation = ENABLE;\n\tHAL_CAN_ConfigFilter(&hcan,&CAN_FilterInitStructure);\n\t \n\t /*===========================安卓-->cc 过滤器=============================*/\n  //广播包过滤\n  CAN_FilterInitStructure.FilterBank  = 3;     /* 过滤器组 */\n  CAN_FilterInitStructure.FilterMode    = CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n  CAN_FilterInitStructure.FilterScale   = CAN_FILTERSCALE_32BIT; ///* 32位 */\n   \n  CAN_FilterInitStructure.FilterIdHigh      = FILTER_MASK_H(filter_value);  \n  CAN_FilterInitStructure.FilterIdLow       = FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n  CAN_FilterInitStructure.FilterMaskIdHigh  = FILTER_MASK_H(filter_mask);\n  CAN_FilterInitStructure.FilterMaskIdLow   = FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n    \n  CAN_FilterInitStructure.FilterFIFOAssignment  = CAN_FILTER_FIFO1;  ///* 能够通过该过滤器的报文存到fifo0中 */\n  CAN_FilterInitStructure.FilterActivation = ENABLE;\n  HAL_CAN_ConfigFilter(&hcan2,&CAN_FilterInitStructure);\n   \n  /*===========================安卓-->cc 过滤器=============================*/\n  //cc包过滤\n   filter_value = MUTIL_MASTER_FILTERID;\n   filter_mask = MUTIL_MASTER_MASK0;\n     \n  \n  CAN_FilterInitStructure.FilterBank  = 4;     /* 过滤器组 */\n  CAN_FilterInitStructure.FilterMode    = CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n  CAN_FilterInitStructure.FilterScale   = CAN_FILTERSCALE_32BIT; ///* 32位 */\n   \n  CAN_FilterInitStructure.FilterIdHigh      = FILTER_MASK_H(filter_value);  \n  CAN_FilterInitStructure.FilterIdLow       = FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n  CAN_FilterInitStructure.FilterMaskIdHigh  = FILTER_MASK_H(filter_mask);\n  CAN_FilterInitStructure.FilterMaskIdLow   = FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n    \n  CAN_FilterInitStructure.FilterFIFOAssignment  = CAN_FILTER_FIFO1;  ///* 能够通过该过滤器的报文存到fifo0中 */\n  CAN_FilterInitStructure.FilterActivation = ENABLE;\n  HAL_CAN_ConfigFilter(&hcan2,&CAN_FilterInitStructure);\n  \n  //安卓-->餐格包过滤\n   filter_value = MUTIL_MASTER_FILTERID;\n   filter_mask = MUTIL_MASTER_MASK1;\n  \n  CAN_FilterInitStructure.FilterBank  = 5;     /* 过滤器组 */\n  CAN_FilterInitStructure.FilterMode    = CAN_FILTERMODE_IDMASK;//CAN_FilterMode_IdList;//CAN_FilterMode_IdMask;  /* 屏敝模式 */\n  CAN_FilterInitStructure.FilterScale   = CAN_FILTERSCALE_32BIT; ///* 32位 */\n\n  CAN_FilterInitStructure.FilterIdHigh      = FILTER_MASK_H(filter_value);  \n  CAN_FilterInitStructure.FilterIdLow       = FILTER_MASK_L(filter_value)|CAN_ID_EXT;\n  CAN_FilterInitStructure.FilterMaskIdHigh  = FILTER_MASK_H(filter_mask);\n  CAN_FilterInitStructure.FilterMaskIdLow   = FILTER_MASK_L(filter_mask)|CAN_ID_EXT;\n\n  CAN_FilterInitStructure.FilterFIFOAssignment  = CAN_FILTER_FIFO1;  ///* 能够通过该过滤器的报文存到fifo0中 */\n  CAN_FilterInitStructure.FilterActivation = ENABLE;\n  HAL_CAN_ConfigFilter(&hcan2,&CAN_FilterInitStructure);\n\t\n\t//CAN1->IER |= CAN_IT_BOF|CAN_IT_FMP0|CAN_IT_ERR;\n\t__HAL_CAN_ENABLE_IT(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);\t//FIFO0消息挂起中断允许.\t \n\t//__HAL_CAN_ENABLE_IT(&hcan, CAN_IT_RX_FIFO1_MSG_PENDING);\t//FIFO0消息挂起中断允许.\t\n\n  //__HAL_CAN_ENABLE_IT(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);  //FIFO0消息挂起中断允许.   \n  __HAL_CAN_ENABLE_IT(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);  //FIFO0消息挂起中断允许.  \n//  HAL_NVIC_SetPriority(CAN1_RX0_IRQn,1,2);    \t//抢占优先级1，子优先级2\n//  HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);          \t//使能中断\n\t  \n\t\t\n\tHAL_CAN_Start(&hcan);\n\tHAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);\n\tHAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO1_MSG_PENDING);\n\n  HAL_CAN_Start(&hcan2);\n  HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);\n  HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);\n\n  /* USER CODE END CAN_Init 2 */\n\n}\n\n/**\n  * @brief SPI1 Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_SPI1_Init(void)\n{\n\n  /* USER CODE BEGIN SPI1_Init 0 */\n\n  /* USER CODE END SPI1_Init 0 */\n\n  /* USER CODE BEGIN SPI1_Init 1 */\n\n  /* USER CODE END SPI1_Init 1 */\n  /* SPI1 parameter configuration*/\n  hspi1.Instance = SPI1;\n  hspi1.Init.Mode = SPI_MODE_MASTER;\n  hspi1.Init.Direction = SPI_DIRECTION_2LINES;\n  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;\n  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;\n  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;\n  hspi1.Init.NSS = SPI_NSS_SOFT;\n  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;\n  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;\n  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;\n  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\n  hspi1.Init.CRCPolynomial = 10;\n  if (HAL_SPI_Init(&hspi1) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN SPI1_Init 2 */\n\t__HAL_SPI_ENABLE(&hspi1);\n  /* USER CODE END SPI1_Init 2 */\n\n}\n\n/**\n  * @brief SPI2 Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_SPI2_Init(void)\n{\n\n  /* USER CODE BEGIN SPI2_Init 0 */\n\n  /* USER CODE END SPI2_Init 0 */\n\n  /* USER CODE BEGIN SPI2_Init 1 */\n\n  /* USER CODE END SPI2_Init 1 */\n  /* SPI2 parameter configuration*/\n  hspi2.Instance = SPI2;\n  hspi2.Init.Mode = SPI_MODE_MASTER;\n  hspi2.Init.Direction = SPI_DIRECTION_2LINES;\n  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;\n  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;\n  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;\n  hspi2.Init.NSS = SPI_NSS_SOFT;\n  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;\n  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;\n  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;\n  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\n  hspi2.Init.CRCPolynomial = 10;\n  if (HAL_SPI_Init(&hspi2) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN SPI2_Init 2 */\n\t__HAL_SPI_ENABLE(&hspi2);\n  /* USER CODE END SPI2_Init 2 */\n\n}\n\n/**\n  * @brief USART1 Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_USART1_UART_Init(void)\n{\n\n  /* USER CODE BEGIN USART1_Init 0 */\n\n  /* USER CODE END USART1_Init 0 */\n\n  /* USER CODE BEGIN USART1_Init 1 */\n\n  /* USER CODE END USART1_Init 1 */\n  huart1.Instance = USART1;\n  huart1.Init.BaudRate = 115200;\n  huart1.Init.WordLength = UART_WORDLENGTH_8B;\n  huart1.Init.StopBits = UART_STOPBITS_1;\n  huart1.Init.Parity = UART_PARITY_NONE;\n  huart1.Init.Mode = UART_MODE_TX_RX;\n  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;\n  huart1.Init.OverSampling = UART_OVERSAMPLING_16;\n  if (HAL_UART_Init(&huart1) != HAL_OK)\n  {\n    Error_Handler();\n  }\n  /* USER CODE BEGIN USART1_Init 2 */\n\t__HAL_UART_ENABLE(&huart1);\n  /* USER CODE END USART1_Init 2 */\n}\n\n/**\n  * @brief GPIO Initialization Function\n  * @param None\n  * @retval None\n  */\nstatic void MX_GPIO_Init(void)\n{\n  GPIO_InitTypeDef GPIO_InitStruct = {0};\n\n  /* GPIO Ports Clock Enable */\n  __HAL_RCC_GPIOC_CLK_ENABLE();\n  __HAL_RCC_GPIOD_CLK_ENABLE();\n  __HAL_RCC_GPIOA_CLK_ENABLE();\n  __HAL_RCC_GPIOB_CLK_ENABLE();\n\n  /*Configure GPIO pin Output Level */\n  HAL_GPIO_WritePin(MAIN_LED_GPIO_Port, MAIN_LED_Pin, GPIO_PIN_RESET);\n\n  /*Configure GPIO pin Output Level */\n  HAL_GPIO_WritePin(GPIOA, LOAD_ACT_0_Pin|LOAD_ACT_1_Pin|LOAD_ACT_2_Pin|LOAD_ACT_3_Pin \n                          |LOAD_ACT_4_Pin|LOAD_ACT_5_Pin|LOAD_ACT_6_Pin|LOAD_ACT_7_Pin \n                          |LOAD_ACT_8_Pin|LOAD_ACT_9_Pin|LOAD_ACT_10_Pin|LOAD_ACT_11_Pin \n                          |AS10_SDN_1_Pin|AS10_CS_1_Pin, GPIO_PIN_RESET);\n\n  /*Configure GPIO pin Output Level */\n  HAL_GPIO_WritePin(GPIOB, BEEP_Pin|AS10_SDN_2_Pin|AS10_CS_2_Pin, GPIO_PIN_RESET);\n\n  /*Configure GPIO pin : MAIN_LED_Pin */\n  GPIO_InitStruct.Pin = MAIN_LED_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\n  HAL_GPIO_Init(MAIN_LED_GPIO_Port, &GPIO_InitStruct);\n\n  /*Configure GPIO pins : LOAD_ACT_0_Pin LOAD_ACT_1_Pin LOAD_ACT_2_Pin LOAD_ACT_3_Pin \n                           LOAD_ACT_4_Pin LOAD_ACT_5_Pin LOAD_ACT_6_Pin LOAD_ACT_7_Pin \n                           LOAD_ACT_8_Pin LOAD_ACT_9_Pin LOAD_ACT_10_Pin LOAD_ACT_11_Pin \n                           AS10_SDN_1_Pin AS10_CS_1_Pin */\n  GPIO_InitStruct.Pin = LOAD_ACT_0_Pin|LOAD_ACT_1_Pin|LOAD_ACT_2_Pin|LOAD_ACT_3_Pin \n                          |LOAD_ACT_4_Pin|LOAD_ACT_5_Pin|LOAD_ACT_6_Pin|LOAD_ACT_7_Pin \n                          |LOAD_ACT_8_Pin|LOAD_ACT_9_Pin|LOAD_ACT_10_Pin|LOAD_ACT_11_Pin \n                          |AS10_SDN_1_Pin|AS10_CS_1_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\n  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\n\n  /*Configure GPIO pins : AS10_IRQ_1_Pin AS10_IRQ_2_Pin */\n  GPIO_InitStruct.Pin = AS10_IRQ_1_Pin|AS10_IRQ_2_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;\n  GPIO_InitStruct.Pull = GPIO_PULLUP;\n  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);\n\n  /*Configure GPIO pins : BEEP_Pin AS10_SDN_2_Pin AS10_CS_2_Pin */\n  GPIO_InitStruct.Pin = BEEP_Pin|AS10_SDN_2_Pin|AS10_CS_2_Pin;\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\n  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);\n\n  /* EXTI interrupt init*/\n  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);\n  HAL_NVIC_EnableIRQ(EXTI0_IRQn);\n\n  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);\n  HAL_NVIC_EnableIRQ(EXTI1_IRQn);\n\n}\n\n/* USER CODE BEGIN 4 */\n\n/* USER CODE END 4 */\n\n/**\n  * @brief  This function is executed in case of error occurrence.\n  * @retval None\n  */\nvoid Error_Handler(void)\n{\n  /* USER CODE BEGIN Error_Handler_Debug */\n  /* User can add his own implementation to report the HAL error return state */\n\n  /* USER CODE END Error_Handler_Debug */\n}\n\n#ifdef  USE_FULL_ASSERT\n/**\n  * @brief  Reports the name of the source file and the source line number\n  *         where the assert_param error has occurred.\n  * @param  file: pointer to the source file name\n  * @param  line: assert_param error line source number\n  * @retval None\n  */\nvoid assert_failed(uint8_t *file, uint32_t line)\n{ \n  /* USER CODE BEGIN 6 */\n  /* User can add his own implementation to report the file name and line number,\n     tex: printf(\"Wrong parameters value: file %s on line %d\\r\\n\", file, line) */\n  /* USER CODE END 6 */\n}\n#endif /* USE_FULL_ASSERT */\n\n/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/\n\n/*==================================================================================\n* 函 数 名： bsp_init\n* 参    数： None\n* 功能描述:  板级初始化\n* 返 回 值： None\n* 备    注： \n* 作    者： xiaozh\n* 创建时间： 2019-09-17 121426\n==================================================================================*/\nvoid bsp_init(void)\n{\n\tMX_GPIO_Init();\n\tMX_CAN_Init();\n\tMX_SPI1_Init();\n\t//MX_SPI2_Init();\n\tMX_USART1_UART_Init();\n\t__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);    //使能接收中断\n}\n",
+							"origin_encoding": "GB2312",
+							"revert_to_scratch": true,
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 32.0
+	},
+	"input":
+	{
+		"height": 44.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"output.raw_line_edit_view":
+	{
+		"height": 702.0
+	},
+	"pinned_build_system": "",
+	"project": "RADIO_CAN.sublime-project",
+	"replace":
+	{
+		"height": 60.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 380.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 217.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
