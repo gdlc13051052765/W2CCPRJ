@@ -3,7 +3,7 @@
 #include "struct_type.h"
 #include "config_can.h"
 #include "box_info.h"
-
+#include <time.h>
 #include "iap_protocols.h"
 
 //CAN 协议处理函数
@@ -49,9 +49,11 @@ void can1_frame_parse(void* ret_msg)
 		}
 		case Android_CC_EMPTY_ADDR_AND_UP_CPUID:
 		{
-			int a = (rand()%19)*100 +500;
-			int b = (rand()%19)*100 +500;
-			TaskSetTimes(TASK_CC_RADIO_ANDROID,a+b);
+			temp = get_mcu_id();
+			srand(temp);
+			int a = (rand()%59)*100 ;
+			//int b = (rand()%99)*50 ;
+			TaskSetTimes(TASK_CC_RADIO_ANDROID,a);
 			EnableTask(TASK_CC_RADIO_ANDROID);//使能CC广播任务
 			debug_print("send Android_CC_EMPTY_ADDR_AND_UP_CPUID \r\n");
 			//清空地址，并上传cpuID，			
@@ -73,8 +75,8 @@ void can1_frame_parse(void* ret_msg)
 				can_send_addr_config_to_android(CC_Android_UP_ADDR,0);
 				debug_print("CC new addr == %d config ok \n",mApp_Param.can_addr);
 				
-				set_box_power(0xff,0);
-				set_box_power(mApp_Param.can_addr,1);
+//				set_box_power(0xff,0);
+//				set_box_power(mApp_Param.can_addr,1);
 			}
 			
 			break;
@@ -250,7 +252,7 @@ static void can_send_heart_to_android(char cmd, char msg_id)
 	send_buff[0] = BOX_SUCCESS;
 	send_buff[1] = temp & 0x00FF;
 	send_buff[2] = temp>>8 & 0x01;
-	printf("send_buff==%2X %2X",send_buff[1],send_buff[2]);
+	printf("send_buff==%2X %2X\r\n",send_buff[1],send_buff[2]);
 	can_send_one_pkg_to_Android_by_link(cmd, msg_id, send_buff, 3);
 }
 

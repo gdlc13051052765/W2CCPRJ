@@ -269,6 +269,8 @@ static void can_send_mcuid_to_android(char cmd,char msg_id)
 	uint8_t send_buff[4] = {0};
 	uint32_t temp;
 	
+	mApp_Param.can_addr = (mApp_Param.can_addr++)%9 +1;
+	//mApp_Param.can_addr = rand()%9 +1;
 	temp = get_mcu_id();
 	send_buff[3] = temp>>24;
 	send_buff[2] = temp>>16;
@@ -287,8 +289,17 @@ static void can_send_mcuid_to_android(char cmd,char msg_id)
 * 作    者： lc
 * 创建时间： 2021-02-05 105001
 ==================================================================================*/
+
 void cc_radio_send_to_android_task(void* argv)
 {
+	
+	uint32_t temp = get_mcu_id();
+	srand(temp);
+	int a = (rand()%59)*100 +500;
+	int b = (rand()%99)*50 +500;
+	TaskSetTimes(TASK_CC_RADIO_ANDROID,a+b);
+	DisableTask(TASK_CC_RADIO_ANDROID);//disable CC广播任务
+//	EnableTask(TASK_CC_RADIO_ANDROID);//使能CC广播任务
 	can_send_mcuid_to_android(CC_Android_UP_CPU_ID,0);
 }
 
